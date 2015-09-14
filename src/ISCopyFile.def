@@ -1,0 +1,5 @@
+LIBRARY
+
+EXPORTS
+isCopyFile					@1
+BreakCopy					@2
