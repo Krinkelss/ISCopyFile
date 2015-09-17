@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include "utils.h"
 #include <stdio.h>
 #include "resource.h"
@@ -11,7 +11,14 @@ typedef int ( __stdcall *FileCopyCallback_t )( int AllSize, int mCopySize, wchar
 #include <windows.h>
 #include <strsafe.h>
 
-BOOL mCopy = TRUE;
+BOOL mCopy;
+
+HANDLE hEvent=NULL, hThread=NULL;
+DWORD thID=NULL;
+FileList_t *FileList;
+wchar_t mPathOut[ _MAX_PATH ] = {};
+int SizePathOut;
+BOOL mbInnerFolders;
 
 void ErrorExit(LPTSTR lpszFunction) 
 { 
@@ -45,9 +52,40 @@ void ErrorExit(LPTSTR lpszFunction)
 	LocalFree(lpDisplayBuf);
 }
 //////////////////////////////////////////////////////////////////////////
-void __stdcall BreakCopy( BOOL fCopy )
+void __stdcall BreakCopy( void )
 {
-	mCopy = fCopy;
+	mCopy = FALSE;
+}
+
+int WaitWithMessageLoop( const HANDLE * hEvent, int count = 1 )
+{
+	DWORD dwEvent;
+	MSG msg;
+
+	while( true )
+	{
+
+		dwEvent = WaitForSingleObject( &hEvent, 1 );
+
+		if( dwEvent >= WAIT_OBJECT_0 && dwEvent < WAIT_OBJECT_0 + count )
+		{
+			return dwEvent - WAIT_OBJECT_0;
+		}
+		
+		while( PeekMessage( &msg, NULL, NULL, NULL, PM_REMOVE ) )
+		{
+			TranslateMessage( &msg );
+			DispatchMessage( &msg );
+		}
+	}
+}
+
+DWORD WINAPI SearchThread (LPVOID IpParam)
+{
+	SearchFiles( mPathOut, FileList, mbInnerFolders, SizePathOut );
+	hThread = NULL;
+	SetEvent( hEvent );
+	return 0;
 }
 
 void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_t *PathIn, BOOL bInnerFolders )
@@ -59,15 +97,28 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	int PolKilo = 1024 * 512;
 	wchar_t *TempBuf;
 	size_t result;
-	FileList_t *FileList;
+
+	mCopy = TRUE;
 		
 	FileList = ( FileList_t * )FileList_Init();
 
 	TempBuf = ( wchar_t * )malloc( PolKilo );
-	int SizePathOut = wcslen( PathOut );
-
+	SizePathOut = wcslen( PathOut );
+	mbInnerFolders = bInnerFolders;
+	wcscpy( mPathOut, PathOut );
+	
 	// Ищем файлы
-	SearchFiles( PathOut, FileList, bInnerFolders, SizePathOut );
+	SECURITY_ATTRIBUTES sa;
+	ZeroMemory (&sa, sizeof(sa));
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+	sa.lpSecurityDescriptor = NULL;
+	hEvent = CreateEvent (&sa, false, false, NULL);
+	hThread = CreateThread (&sa, NULL, SearchThread, NULL, NULL, &thID);
+
+	WaitWithMessageLoop( &hEvent );
+	CloseHandle( hEvent );
+	CloseHandle( hThread );
 
 	FileList->AllSize = FileList->AllSize / 1024 ;
 		
@@ -90,8 +141,7 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 		if( bInnerFolders )
 			wsprintf( TempDir, L"%s\\%s", PathIn, FileList->Files[ z ] + SizePathOut - 1 );
 		else
-			wsprintf( TempDir, L"%s\\%s", PathIn, GetExeName( FileList->Files[ z ] ) );
-
+			wsprintf( TempDir, L"%s\\%s", PathIn, GetFileName( FileList->Files[ z ] ) );
 		mFileIn = _wfopen( TempDir, L"wb" );
 		if( mFileIn == NULL )
 			break;
@@ -106,7 +156,6 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 			result = fread( TempBuf, 1, PolKilo, mFileOut );
 			if( ferror( mFileOut ) )
 			{
-				//MessageBox( 0, L"Error", NULL, IDOK );
 				ErrorExit( L"fread" );
 				fclose( mFileOut );
 				fclose( mFileIn );
@@ -118,12 +167,11 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 			fwrite( TempBuf, 1, result, mFileIn );
 			if( ferror( mFileIn ) )
 			{
-				ErrorExit( L"fwrite" );
 				fclose( mFileOut );
 				fclose( mFileIn );
 				continue;
 			}
-			callback( ( int )FileList->AllSize, mCopySize / 1024, FileList->Files[ z ] );
+			callback( ( int )FileList->AllSize, mCopySize / 1024, L"" );
 		}
 		
 		fclose( mFileOut );
