@@ -1,4 +1,4 @@
-﻿#include "utils.h"
+#include "utils.h"
 #include <tchar.h>
 
 int GetFileSize( LPCWSTR File )
@@ -199,7 +199,7 @@ wchar_t *GetShortFileName( wchar_t *FileNames )
 		return ( wchar_t * )FileNames;
 }
 
-wchar_t *GetExeName( const wchar_t *Str )
+wchar_t *GetFileName( const wchar_t *Str )
 {
 	wchar_t name[ _MAX_FNAME ] = {0};
 	wchar_t ext[ _MAX_EXT ] = {0};
@@ -210,4 +210,45 @@ wchar_t *GetExeName( const wchar_t *Str )
 	wsprintf( Result, L"%s%s", name, ext );
 			
 	return ( wchar_t * )GetShortFileName( Result );
+}
+
+char *convertUnicode( const wchar_t* src )
+{
+	static char ConvertResult[ _MAX_PATH ] = {0};
+	if( src == NULL )
+		return NULL;
+
+	int cbLen = WideCharToMultiByte( CP_ACP, 0, src, -1, NULL, 0, NULL, NULL );
+
+	WideCharToMultiByte( CP_ACP, 0, src, -1, ConvertResult, cbLen, NULL, NULL );
+	ConvertResult[ cbLen ] = 0;
+	return ConvertResult;
+}
+
+int WaitWithMessageLoop( const HANDLE * hEvent, int count )
+{
+	DWORD dwEvent;
+	MSG msg;
+
+	while( true )
+	{
+		dwEvent = MsgWaitForMultipleObjects( count,    // One event to wait for
+			hEvent,        // The array of events
+			FALSE,          // Wait for all event ?
+			10,         // Timeout value
+			QS_ALLINPUT );   // Any message wakes up
+
+		// Return value indicates which event is signaled.
+		if( dwEvent >= WAIT_OBJECT_0 && dwEvent < WAIT_OBJECT_0 + count )
+		{
+			// The event was signaled, return
+			return dwEvent - WAIT_OBJECT_0;
+		}
+		// There is a window message available. Dispatch it.
+		while( PeekMessage( &msg, NULL, NULL, NULL, PM_REMOVE ) )
+		{
+			TranslateMessage( &msg );
+			DispatchMessage( &msg );
+		}
+	}
 }
