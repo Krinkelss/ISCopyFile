@@ -1,3 +1,10 @@
+#ifndef IS_ENHANCED
+	#error Необходимо расширенное издание Inno Setup (restools) для компилляции этого скрипта
+#endif
+
+#define PathOut      "'C:\Program Files\*'"				/* откуда копируем */
+#define PathIn     	 "'C:\123'"         					/* куда копируем	 */
+
 [Setup]
 AppName=My Program
 AppVerName=My Program version 1.5
@@ -14,21 +21,18 @@ Source: ISCopyFile.dll; Flags: dontcopy
 Name: {group}\Uninstall; IconFilename: {app}\unins000.exe; Filename: {app}\unins000.exe
 
 [Code]
-const
-  PM_REMOVE = 1;
-	
 var
  Button1: TButton;
- CopyInfoLabel: TLabel;
- str: AnsiString;
+ CopyInfoLabel, FileInfoLabel: TLabel;
+ AllSize: Integer;
 
-// PathOut - Откуда копировать. Можно указывать маски для копирования, или оставить звездочку и будет копироваться все 
+// PathOut - Откуда копировать. Можно указывать маски для копирования, или оставить звездочку и будет копироваться все
 // Для копирования отдельных файлов прописываем их в PathOut, и обязательно ставим bInnerFolders как false
 // PathIn - Куда копировать
 // bInnerFolders - Включать ли подпапки
-function isCopyFile(callback: Longword; PathOut,PathIn: String; bInnerFolders: bool): integer; external 'isCopyFile@files:ISCopyFile.dll stdcall';
+function isCopyFile(callback: Longword; PathOut, PathIn: String; bInnerFolders: bool): integer; external 'isCopyFile@files:ISCopyFile.dll stdcall';
 procedure BreakCopy(); external 'BreakCopy@files:ISCopyFile.dll stdcall';
- 
+
 procedure Button1OnClick(Sender: TObject);
 begin
   BreakCopy();
@@ -37,24 +41,30 @@ end;
 function MbOrTb(Float: Extended): String;
 begin
 	if Float/1024 < 1024 then Result:= format('%.2n', [Float/1024])+' МБ' else
-		Result:= format('%.2n', [Float/(1024*1024)])+' ГБ'; 
+		Result:= format('%.2n', [Float/(1024*1024)])+' ГБ';
     StringChange(Result, ',', '.');
 end;
 
-// AllSize - Общий размер для копирования
-// mCopySize - Сколько всего скопировано
-// str - Копирующийся файл
-function mCallback(AllSize,mCopySize: Longint; str: AnsiString): Boolean;
+function mCallback( what: PAnsiChar; int1: Longint; str: PAnsiChar): Boolean;
 begin
-	CopyInfoLabel.Caption:= 'Скопировано '+MbOrTb(mCopySize)+' из '+MbOrTb(AllSize);
-	WizardForm.ProgressGauge.Position:= Round(mCopySize);
-	WizardForm.ProgressGauge.Max:= AllSize;
+	if (string(what) = 'allsize') then
+		AllSize:= int1;
+
+	if(string(what) = 'filename') then
+		FileInfoLabel.Caption:= MinimizePathName(str, WizardForm.StatusLabel.Font, WizardForm.StatusLabel.Width);
+
+	if (string(what) = 'write') then begin
+		CopyInfoLabel.Caption:= 'Скопировано '+MbOrTb(int1) + ' из ' + MbOrTb(AllSize);
+		WizardForm.ProgressGauge.Position:= Round(int1);
+		WizardForm.ProgressGauge.Max:= AllSize;
+	end;
 	Application.ProcessMessages;
 end;
 
 procedure mCopyFiles(mOut: String; mIn: String);
 var
 	callback: Longword;
+
 begin
   callback:= CallbackAddr('mCallback');
   try
@@ -78,6 +88,17 @@ begin
     Transparent:= True;
     Parent:= WizardForm.InstallingPage;
   end;
+
+  FileInfoLabel:= TLabel.Create(WizardForm);
+  with FileInfoLabel do begin
+    Left:= WizardForm.ProgressGauge.Left;
+    Top:= WizardForm.ProgressGauge.Top+WizardForm.ProgressGauge.Height+ScaleY(25);
+    Width:= WizardForm.StatusLabel.Width;
+    Height:= WizardForm.StatusLabel.Height;
+    AutoSize:= False;
+    Transparent:= True;
+    Parent:= WizardForm.InstallingPage;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -95,8 +116,8 @@ begin
 				Top:= WizardForm.Cancelbutton.top;
 				OnClick:= @Button1OnClick;
 			end;
-			
-			mCopyFiles('C:\123\*', 'C:\321');
+
+			mCopyFiles({#PathOut}, {#PathIn});
 		end;
   end;
 end;
