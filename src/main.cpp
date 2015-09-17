@@ -5,7 +5,7 @@
 
 #pragma comment(linker, "/ENTRY:DllMain")
 
-typedef int ( __stdcall *FileCopyCallback_t )( int AllSize, int mCopySize, wchar_t *Str );
+typedef int ( __stdcall *FileCopyCallback_t )( char *what, int int1, char *Str );
 
 //////////////////////////////////////////////////////////////////////////
 #include <windows.h>
@@ -16,9 +16,10 @@ BOOL mCopy;
 HANDLE hEvent=NULL, hThread=NULL;
 DWORD thID=NULL;
 FileList_t *FileList;
-wchar_t mPathOut[ _MAX_PATH ] = {};
+wchar_t mPathOut[ _MAX_PATH ] = {0};
 int SizePathOut;
 BOOL mbInnerFolders;
+char ConvertPath[ _MAX_PATH ] = {0};
 
 void ErrorExit(LPTSTR lpszFunction) 
 { 
@@ -55,33 +56,13 @@ void ErrorExit(LPTSTR lpszFunction)
 void __stdcall BreakCopy( void )
 {
 	mCopy = FALSE;
-}
 
-int WaitWithMessageLoop( const HANDLE * hEvent, int count = 1 )
-{
-	DWORD dwEvent;
-	MSG msg;
-
-	while( true )
-	{
-
-		dwEvent = WaitForSingleObject( &hEvent, 1 );
-
-		if( dwEvent >= WAIT_OBJECT_0 && dwEvent < WAIT_OBJECT_0 + count )
-		{
-			return dwEvent - WAIT_OBJECT_0;
-		}
-		
-		while( PeekMessage( &msg, NULL, NULL, NULL, PM_REMOVE ) )
-		{
-			TranslateMessage( &msg );
-			DispatchMessage( &msg );
-		}
-	}
+	if( hEvent )
+		SetEvent( hEvent );
 }
 
 DWORD WINAPI SearchThread (LPVOID IpParam)
-{
+{	
 	SearchFiles( mPathOut, FileList, mbInnerFolders, SizePathOut );
 	hThread = NULL;
 	SetEvent( hEvent );
@@ -121,6 +102,8 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	CloseHandle( hThread );
 
 	FileList->AllSize = FileList->AllSize / 1024 ;
+	
+	callback( "allsize", ( int )FileList->AllSize, "" );
 		
 	// Создаем папку
 	CreateDirectoryTree( PathIn );
@@ -146,6 +129,8 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 		if( mFileIn == NULL )
 			break;
 
+		callback( "filename", 0, convertUnicode( FileList->Files[ z ] ) );
+		
 		// Открываем исходный файл
 		mFileOut = _wfopen( FileList->Files[ z ], L"rb" );
 		if( mFileIn == NULL )
@@ -166,12 +151,13 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 
 			fwrite( TempBuf, 1, result, mFileIn );
 			if( ferror( mFileIn ) )
-			{
+			{				
+				ErrorExit( L"fread" );
 				fclose( mFileOut );
 				fclose( mFileIn );
 				continue;
 			}
-			callback( ( int )FileList->AllSize, mCopySize / 1024, L"" );
+			callback( "write", mCopySize / 1024, "" );
 		}
 		
 		fclose( mFileOut );
