@@ -1,4 +1,4 @@
-﻿#ifndef __UTILS_H__
+#ifndef __UTILS_H__
 #define __UTILS_H__
 
 #include <windows.h>
@@ -21,6 +21,8 @@ void FileList_Free( FileList_t *List );
 void FileList_Free( FileList_t *List );
 BOOL SearchFiles( LPCTSTR lpszFileName, FileList_t *FileList,  BOOL bInnerFolders = FALSE, int StrLen = 0 );
 bool CreateDirectoryTree(LPTSTR szDir);
-wchar_t *GetExeName( const wchar_t *Str );
+wchar_t *GetFileName( const wchar_t *Str );
+char *convertUnicode( const wchar_t* src );
+int WaitWithMessageLoop( const HANDLE * hEvent, int count = 1 );
 
 #endif		// __UTILS_H__
