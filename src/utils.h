@@ -16,6 +16,8 @@ typedef struct
 	int AllDir;					// Не в счет
 } FileList_t;
 
+extern BOOL mCopy;
+
 INT_PTR FileList_Init( void );
 void FileList_Free( FileList_t *List );
 void FileList_Free( FileList_t *List );
