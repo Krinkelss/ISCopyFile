@@ -1,6 +1,8 @@
 #include "utils.h"
 #include <tchar.h>
 
+BOOL mCopy;
+
 int GetFileSize( LPCWSTR File )
 {
 	int nFileLen = 0;
@@ -148,7 +150,7 @@ BOOL SearchFiles( LPCTSTR lpszFileName, FileList_t *FileList,  BOOL bInnerFolder
 					SearchFiles( next, FileList, TRUE, StrLen );
 				}
 			}
-			while ( FindNextFileW( hSearch, &wfd ) );
+			while ( FindNextFileW( hSearch, &wfd ) && mCopy );
 
 			FindClose ( hSearch );
 	}
@@ -164,7 +166,7 @@ BOOL SearchFiles( LPCTSTR lpszFileName, FileList_t *FileList,  BOOL bInnerFolder
 		
 		FileList_Add( FileList, file );
 	}
-	while ( FindNextFileW( hSearch, &wfd ) );
+	while ( FindNextFileW( hSearch, &wfd ) && mCopy );
 	FindClose ( hSearch );
 	return TRUE;
 }
