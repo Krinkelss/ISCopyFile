@@ -67,7 +67,7 @@ DWORD WINAPI SearchThread (LPVOID IpParam)
 	return 0;
 }
 
-void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_t *PathIn, BOOL bInnerFolders )
+int __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_t *PathIn, BOOL bInnerFolders )
 {	
 	wchar_t TempDir[ _MAX_PATH ] = {0};
 	__int64 mCopySize = 0;
@@ -78,14 +78,14 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	size_t result;
 
 	mCopy = TRUE;
-		
+
 	FileList = ( FileList_t * )FileList_Init();
 
 	TempBuf = ( wchar_t * )malloc( PolKilo );
 	SizePathOut = wcslen( PathOut );
 	mbInnerFolders = bInnerFolders;
 	wcscpy( mPathOut, PathOut );
-	
+
 	// Ищем файлы
 	SECURITY_ATTRIBUTES sa;
 	ZeroMemory (&sa, sizeof(sa));
@@ -96,7 +96,7 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	hThread = CreateThread (&sa, NULL, SearchThread, NULL, NULL, &thID);
 
 	WaitWithMessageLoop( &hEvent );
-	
+
 	CloseHandle( hEvent );
 	CloseHandle( hThread );
 
@@ -104,13 +104,13 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	{
 		free( TempBuf );
 		FileList_Free( FileList );
-		return;
+		return 0;
 	}
 
 	FileList->AllSize = FileList->AllSize / 1024 ;
-	
+
 	callback( "allsize", ( int )FileList->AllSize, "" );
-		
+
 	// Создаем папку
 	CreateDirectoryTree( PathIn );
 
@@ -136,7 +136,7 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 			break;
 
 		callback( "filename", 0, convertUnicode( FileList->Files[ z ] ) );
-		
+
 		// Открываем исходный файл
 		mFileOut = _wfopen( FileList->Files[ z ], L"rb" );
 		if( mFileIn == NULL )
@@ -165,13 +165,14 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 			}
 			callback( "write", mCopySize / 1024, "" );
 		}
-		
+
 		fclose( mFileOut );
 		fclose( mFileIn );
 	}
 	free( TempBuf );
 
 	FileList_Free( FileList );
+	return 0;
 }
 
 extern "C" BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /*lpReserved*/)
