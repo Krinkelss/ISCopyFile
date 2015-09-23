@@ -1,7 +1,8 @@
 #include <windows.h>
 #include "utils.h"
 #include <stdio.h>
-#include "resource.h"
+
+#pragma warning( disable : 4995 ) // Отключаем ошибку типа "warning C4995: wcscpy: имя помечено как #pragma deprecated"
 
 #pragma comment(linker, "/ENTRY:DllMain")
 
@@ -11,7 +12,7 @@ typedef int ( __stdcall *FileCopyCallback_t )( char *what, int int1, char *Str )
 #include <windows.h>
 #include <strsafe.h>
 
-BOOL mCopy;
+//BOOL mCopy;
 
 HANDLE hEvent=NULL, hThread=NULL;
 DWORD thID=NULL;
@@ -55,10 +56,7 @@ void ErrorExit(LPTSTR lpszFunction)
 //////////////////////////////////////////////////////////////////////////
 void __stdcall BreakCopy( void )
 {
-	mCopy = FALSE;
-
-	if( hEvent )
-		SetEvent( hEvent );
+	mCopy = FALSE;	
 }
 
 DWORD WINAPI SearchThread (LPVOID IpParam)
@@ -98,8 +96,16 @@ void __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_
 	hThread = CreateThread (&sa, NULL, SearchThread, NULL, NULL, &thID);
 
 	WaitWithMessageLoop( &hEvent );
+	
 	CloseHandle( hEvent );
 	CloseHandle( hThread );
+
+	if( !mCopy )
+	{
+		free( TempBuf );
+		FileList_Free( FileList );
+		return;
+	}
 
 	FileList->AllSize = FileList->AllSize / 1024 ;
 	
