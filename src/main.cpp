@@ -172,7 +172,7 @@ int __stdcall isCopyFile( FileCopyCallback_t callback, wchar_t *PathOut, wchar_t
 	free( TempBuf );
 
 	FileList_Free( FileList );
-	return 0;
+	return 1;
 }
 
 extern "C" BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /*lpReserved*/)
